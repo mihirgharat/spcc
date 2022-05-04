@@ -1,0 +1,510 @@
+2 PASS ASSEMBLER---------------------
+asm = []
+f=["JOHN START 0","USING *,15","L 1,FIVE","A 1,FOUR","ST 1,TEMP","FOUR DC F'4'","FIVE DC F'5'","TEMP DS 1F","END"]
+for i in f:
+    asm.append(i.split())
+oprands = ["START", "USING", "DC", "DS", "END", "A", "L", "ST"]
+Poprands = ["START", "USING", "L", "END"]
+mot = []
+pot = []
+st = []
+lt = []
+bt = []
+lc = 0
+def newLC(op, opc):
+  if op in Poprands:
+    return 0
+  else:
+    return 2 if opc[0] == "H" else 4
+def updateTables(label, oprand, opcode, lc):
+  if oprand not in Poprands or oprand == "L":
+    mot.append((oprand, "", "01", "RX"))
+  else:
+    pot.append((oprand, ""))
+  if "=" in opcode:
+    lt.append((opcode[1:], str(lc), str(newLC(oprand, opcode))))
+  if label != " ":
+    st.append((label+"b"*(8-len(label)), str(lc),str(opcode[2:]),str(len(label))))
+  if oprand == "USING":
+    _,num = opcode.split(",")
+    for i in range(16):
+      if int(num) == i:
+        bt.append((str(i), "Y", "00"))
+      else:
+        bt.append((str(i), "N", "00"))
+for i in asm:
+  if i[0] in oprands:
+    oprand = i[0]
+    label = " "
+  else:
+    label = i[0]
+    oprand = i[1]
+  opcode = i[-1]
+  if oprand == "END" or oprand == "START":
+    opcode = " "
+  lc += newLC(oprand, opcode)
+  updateTables(label, oprand, opcode, lc)
+  print(label, oprand, opcode, lc)
+print()
+print("_" * 20)
+print("Pass1:")
+print("="*10) 
+print("MOT:")
+for i in mot:
+  if i[0] in "DS DC":
+    continue
+  print(" ".join(i))
+print("_"*10)
+print("POT:") 
+for i in pot:
+   print(" ".join(i))
+print("_"*10)
+print("LT:")
+for i in lt:
+  print(" ".join(i))
+print("_"*10)
+print("ST:")
+for i in st:
+  print(" ".join(i))
+print("_" * 20)
+print("Pass2:")
+print("="*10) 
+print("MOT:")
+for i in mot:
+  print(" ".join(i))
+print("_"*10)
+print("POT:") 
+for i in pot:
+  print(" ".join(i))
+print("_"*10)
+print("LT:")
+for i in lt:
+  print(" ".join(i))
+print("_"*10)
+print("ST:")
+for i in st:
+  print(" ".join(i))
+print("_"*10)
+print("BT:")
+for i in bt:
+  print(" ".join(i))
+FIRSTFOLLOW-------------------------------
+firsts = {}
+follows = {}
+prods = {}
+n = int(input("Enter number of production rules: "))
+class Prod:
+    ter = None
+    def __init__(self, p) -> None:
+        _, p = p.split("->")
+        p = p.split("|") 
+        self.rules = p
+        self.ter = _ 
+    def __str__(self) -> str:
+        return f"{self.ter} {self.rules}"
+def CheckFirst(prod: Prod):
+    first = set()
+    for rule in prod.rules:
+        if not rule[0].isupper():
+            first.add(rule[0])
+        elif '@' == rule:
+            first.add('@')
+        else:
+            for idx, Y in enumerate(rule):
+                if Y == "'":
+                    continue
+                if idx+1 < len(rule) and rule[idx+1] == "'":
+                    Y+= "'" 
+                if Y.isupper():
+                    firstY = CheckFirst(prods[Y])
+                    for i in firstY:
+                        first.add(i) 
+                    if not "@" in firstY:
+                        break
+                if idx != len(rule) - 1:
+                    first.remove("@")
+    return first               
+def checkFollow(prod: Prod):
+  
+  if prod.ter == 'S':
+    return set(["$"])
+  
+  follow = set()
+
+  regex = r"[A-B]"
+  for rule in prod.rules:
+    matches = re.finditer(regex, rule, re.MULTILINE)
+    for j in range(len(rule)):
+        if(rule[j].islower() and j!=0 and rule[j-1].isupper()):
+            follow.add(rule[j])
+    
+    for i in matches:
+      ter = i[0]
+      # A -> aBb
+      if i.span()[0] != 0 and i.span()[1] != len(rule):
+        temp = firsts[ter]
+        for f in temp:
+          if "@" == f:
+            continue 
+          follow.add(f)
+      # A -> aB || A -> aBb
+      elif i.span()[0] != 0:
+        temp = checkFollow(prods[ter])
+        for f in temp:
+          follow.add(f)
+  return follow
+for i in range(n):
+    prod = input("Enter prod rule: ")
+    prods[prod.split('->')[0]]=(Prod(prod))
+for ter, prod in prods.items():
+    firsts[ter] = CheckFirst(prod)
+    follows[ter] = checkFollow(prod)
+print(f"_"*15)
+for ter, rule in firsts.items():
+  print(f"{ter} :")
+  print(rule)
+print(f"_"*15)
+for ter, rule in follows.items():
+  print(f"{ter} :")
+  print(rule)
+CODE OPTIMIZATION ------------------------------
+A. Algebraic simplification:---------------------
+def asm(code):
+  code1=[]
+  for i in code:
+    if "+0" in i:
+      i=i.replace("+0","")
+    if "*1" in i:
+      i=i.replace("*1","")
+    code1.append(i)
+  for i in code1:
+    i=i.split("=")
+    if(i[0]==i[1]):
+      continue
+    print(i[0]+"="+i[1])
+n=int(input("Enter number:"))
+code=[]
+for _ in range(n):
+  s=input("Enter line:")
+  code.append(s)
+asm(code)
+B. Strength Reduction --------------------
+def sr(code):
+  ans=[]
+  for i in code:
+    print(i)
+  for i in code:
+    if "*" in i:
+      lhs=i.split("=")[0]
+      j=i.index("*")
+      con=i[j+1]
+      va=i[j-1]
+      newexp=""
+      for _ in range(int(con)):
+        newexp+=va+"+"
+      ans.append(lhs+"="+newexp[:len(newexp)-1])
+    else:
+      ans.append(i)
+  for a in ans:
+     print(a)
+n=int(input("Enter no of lines:"))
+code=[]
+for _ in range(n):
+  s=input("Enter line:")
+  code.append(s)
+sr(code)
+C. Dead Code ------------------------------
+def dc(code):
+  tod=[]
+  for i in code:
+    print(i)
+  print("-"*15)
+  for i in code:
+    #tod=[]
+    if "if" in i:
+      j=code.index(i)
+      i1=i.split(" ")
+      i1[1]=i1[1][1:len(i[1])-2]
+      c=i1[1].split("==")
+      d=code[j-1].split("=")
+      if(c[1]!=d[1]):
+        tod.append(code[j])
+        #code.remove(code[j])
+        j=j+1
+        while(code[j][0]==" "):
+          tod.append(code[j])
+          j=j+1
+          if(j==len(code)):
+            break
+  print("Optimized code after dead code elimination:")
+  for a in code:
+    if "return" in a:
+      break
+    if a in tod:
+      continue
+    print(a)
+n=int(input("Enter no of lines:"))
+code=[]
+for _ in range(n):
+  s=input("Enter line:")
+  code.append(s)
+dc(code)
+ICG----------------------------
+def threeaddr(s):
+      l=s.split(" ")
+      l=l[2:]
+
+      op=['+','-','*','/','^']
+      arg1=[]
+      arg2=[]
+      res=[]
+      oper=[]
+      n=(len(l))//2
+      if(l[n] not in op):
+        while(l[n] not in op):
+          n=n-1
+      p1=l[:n]
+      p2=l[n+1:]
+      ind=1
+      oper.append('OPERATOR:')
+      arg1.append('ARGUMENT 1:')
+      arg2.append('ARGUMENT2:')
+      res.append('RESULT:')
+      if(len(l)==3):
+        oper.append(l[n])
+        arg1.append(l[0])
+        arg2.append(l[2])
+        res.append("t"+str(ind))
+        z1=zip(oper,arg1,arg2,res)
+        for o in list(z1):
+             print(o)
+      else:
+          m=0
+          for i in p1:
+              if(i[0] in op and len(i)>1):
+                 oper.append(i[0])
+                 arg1.append(i[1])
+                 arg2.append("nill")
+                 res.append("t"+str(ind))
+                 ind=ind+1
+              if(i in op and len(i)==1):
+                 oper.append(i)
+                 arg1.append(p1[m-1])
+                 #print(p1.index(i)+1)
+                 arg2.append(p1[m+1])
+                 res.append("t"+str(ind))
+                # my="t"+str(ind)
+                 my="t"+str(ind)
+                 ind=ind+1
+                 
+              m=m+1
+          #my="t"+str(ind)
+          j=0
+          for i in p2:
+             if(i[0] in op and len(i)>1):
+               oper.append(i[0])
+               arg1.append(i[1])
+               arg2.append("nill")
+               res.append("t"+str(ind))
+               ind=ind+1
+               
+             if(i in op and len(i)==1):  
+               #print(p2[j-1],p2[j+1])
+               oper.append(i)
+               arg1.append(p2[j-1])
+               arg2.append(p2[j+1]) 
+               res.append("t"+str(ind))
+               #you="t"+str(ind)
+               you="t"+str(ind)
+               ind=ind+1
+               
+             j=j+1
+          #you="t"+str(ind)   
+          oper.append(l[n])
+          arg1.append(my)
+          arg2.append(you)
+          res.append("t"+str(ind))
+          oper.append("=")
+          arg1.append(s[0])
+          arg2.append("t"+str(ind))
+          res.append("t"+str(ind+1))
+          z=zip(oper,arg1,arg2,res)
+          ans=[]
+          for a1,a2,a3,a4 in list(z):
+              print(a1,a2,a3,a4)
+              if(a3=="nill"):
+                 s=a4+"="+a1+a2
+              elif(a1=="="):
+                 s=a2+a1+a3
+              else:
+                 s=a4+"="+a2+a1+a3
+              ans.append(s)
+              print("---")
+          for hh in ans[1:]:
+            print(hh)
+              
+      '''
+      for a1,a2,a3,a4 in list(z):
+            print(a)
+            if(a3=="nill"):
+              s=a4+"="+a1+a2
+              print(s)
+            elif(a1=="="):
+              print(a2+a1+a3)
+            else:
+              s=a4+"="+a2+a1+a3
+              print(s)
+     '''
+     
+s=input("Enter code:")
+threeaddr(s)
+CODE GENERATOR--------------------------
+def cg(code):
+    c=code[0]
+    d={}
+    c1=c.split("=")
+    op={'+':'ADD','-':'SUB'}
+    j=1
+    f=""
+    for i in c1[1]:
+        if i in op.keys():
+            f=i
+            continue
+        print("MOV"+ " " + "R"+str(j) + "," + i)
+        j=j+1
+    print(op[f]+" "+"R1"+","+"R2")
+    d[c1[0]]="R1"
+    for w in code[1:]:
+        ch=0
+        mm=0
+        r=[]
+        r=w.split("=")
+        if len(r[1])==1:
+            print("MOV"+" "+r[0]+","+d[r[1]])
+        else:
+          for t in r[1]:
+            if(r[1][0] in d.keys() and r[1][2] in d.keys()):
+              f=r[1][1]
+              m="R1"
+              ch=1
+              mm=1
+              break
+            if(t in op.keys()):
+                f=t
+                continue
+            if(t in d.keys()):
+                ch=1
+                if(r[1].index(t)==0):
+                  ind=2
+                else:
+                  ind=0
+                print("MOV"+" "+" "+"R2"+","+r[1][ind])
+                m=d[t]
+          if(ch==0 and mm!=1):
+            print("MOV"+" "+"R1"+","+r[1][0])
+            print("MOV"+" "+"R2"+","+r[1][2])
+            m="R1"
+          print(op[f]+" "+m+","+"R2")
+        d[r[0]]="R1"
+code=[]
+n=int(input("ENTER NUMBER OF LINES:"))
+for y in range(n):
+    cc=input('ENTER LINE:')
+    code.append(cc)
+cg(code)
+2 PASS MP -------------------------------------
+def loader(ins):
+  mdt=[]
+  mnt=[]
+  ala=[]
+  esource=[]
+  i=0
+  temp=0
+  mindex=[]
+  mi=0
+  ala123=[]
+  while(i<len(ins)):
+   if ins[i]=="MACRO":
+      dummy=[]
+      i=i+1
+      dummy.append(ins[i])
+      mnt.append(ins[i][:ins[i].index(" ")])
+      mindex.append(temp)
+      kj=[]
+      kj=ins[i][ins[i].index(" ")+1:].split(",")
+      kjm=kj
+      ala12=[]
+      for tt in range(len(kj)):
+        ss=""
+        ss="€"+str(int(tt+1))+"-->"+kj[tt]
+        ala12.append(ss)
+      ala123.append(ala12)  
+      ala.append(kj)
+      i=i+1
+      while(ins[i]!="MEND"):
+        kj1=ins[i].split(" ")
+        for ff in kj1[1].split(","):
+         # print(ff)
+          if(ff in kj):
+            #print(ff)
+            ins[i]=ins[i].replace(ff,"€"+str(kj.index(ff)+1))
+           # print(ins[i])
+        mi=mi+1
+        dummy.append(ins[i])
+        i=i+1
+      dummy.append("MEND")
+      mdt.append(dummy)
+      i=i+1
+      temp=i
+   else:
+      i=i+1
+  print("-- PASS 1 RESULTS ---")
+  print("-- MDT --")
+  for a in mdt:
+    print(a)
+  print("-- MNT --")
+  for b in zip(mnt,mindex):
+    print(b)
+  print("--- ALA Pass 1---")
+  for c in ala123:
+    print(c)
+  print("-- PASS 2--")
+  j=0
+  for com in ins[:temp]:
+    esource.append(com)
+  alaa2=[]
+  for com in ins[temp:]:
+    alaa1=[]
+    com1=com.split(" ")
+    if com1[0] in mnt: 
+          cc=com1[1].split(",")        
+          j=mnt.index(com1[0])
+          for f in mdt[j][1:len(mdt[j])-1]:
+             f1=f.split(" ")
+             if(len(f1)>1):
+               f2=f1[1].split(",")
+               #alaa=[]
+               for ii in f2:
+                    alaa=[]
+                    mihir=ala[j]
+                    alaa.append(ii+"-->"+str(cc[int(ii[1:])-1])+"-->"+str(mihir[int(ii[1:])-1]))
+                    f=f.replace(ii,str(cc[int(ii[1:])-1]))
+                    alaa1.append(alaa)
+             esource.append(f)
+          alaa2.append(alaa1)
+    else:
+        esource.append(com)
+  for res in esource:
+      print(res)
+  print("ALA pass 2:")
+  for r in alaa2:
+    print(r)
+    print("-"*15)
+
+n=int(input("Enter no of ins:"))
+ins=[]
+i=0
+while(i<n):
+  ins.append(input("Enter ins:"))
+  i=i+1
+loader(ins)
